@@ -1,0 +1,128 @@
+import {
+    Client,
+    GatewayIntentBits,
+    Events,
+    SlashCommandBuilder,
+    REST,
+    Routes,
+    Interaction
+  } from 'discord.js';
+  import dotenv from 'dotenv';
+  import { saveLastTime, loadLastTime } from './storage';
+  
+  dotenv.config();
+  
+  const TOKEN = process.env.DISCORD_TOKEN!;
+  const CLIENT_ID = process.env.CLIENT_ID!;
+  const GUILD_ID = process.env.GUILD_ID!;
+  
+// initialize the bot client with necessary intents  
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  });
+  
+  // define the commands available for the bot
+  const commands = [
+    new SlashCommandBuilder()
+      .setName('guille_me_hablo')
+      .setDescription('Resetea tu contador porque Guille te habló'),
+    new SlashCommandBuilder()
+      .setName('set_guille_time')
+      .setDescription('Setea manualmente la última vez que Guille te habló')
+      .addStringOption(option =>
+        option.setName('fecha')
+          .setDescription('Fecha en formato YYYY-MM-DD HH:mm')
+          .setRequired(true)),
+    new SlashCommandBuilder()
+      .setName('guille_status')
+      .setDescription('Muestra cuánto tiempo pasó desde que Guille habló con vos o con otro')
+      .addUserOption(option =>
+        option.setName('usuario')
+          .setDescription('Usuario a consultar (opcional)')),
+  ].map(command => command.toJSON());
+  
+
+  // initialize the REST client to interact with Discord's API
+  const rest = new REST({ version: '10' }).setToken(TOKEN);
+  
+  // register the bot commands with Discord
+  (async () => {
+    try {
+      console.log('Registrando comandos');
+      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+      console.log('Comandos registrados.');
+    } catch (err) {
+      console.error(err);
+    }
+  })();
+  
+  // helper function to format the elapsed time in a readable format
+  function getElapsedTimeString(since: Date): string {
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - since.getTime()) / 1000);
+  
+    const days = Math.floor(diff / 86400);
+    const hours = Math.floor((diff % 86400) / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+  
+    return `${days} días, ${hours} horas, ${minutes} minutos, ${seconds} segundos`;
+  }
+  
+  // event listener when the bot is ready
+  client.once(Events.ClientReady, () => {
+    console.log(`Bot iniciado como ${client.user?.tag}`);
+  });
+  
+  // event listener for interactions (slash commands)
+  client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+  
+    const userId = interaction.user.id;
+  
+    if (interaction.commandName === 'guille_me_hablo') {
+      const now = new Date();
+      saveLastTime(userId, now);
+      await interaction.reply(`⏱️ Contador reiniciado. Han pasado 0 días desde que Guille te habló.`);
+    }
+  
+    if (interaction.commandName === 'set_guille_time') {
+      const fechaStr = interaction.options.getString('fecha', true);
+      const parsed = new Date(fechaStr);
+  
+      if (isNaN(parsed.getTime())) {
+        await interaction.reply('❌ Fecha inválida. Usá el formato `YYYY-MM-DD HH:mm`.');
+        return;
+      }
+  
+      saveLastTime(userId, parsed);
+      await interaction.reply(`✅ Fecha actualizada. Nuevo tiempo: ${getElapsedTimeString(parsed)}`);
+    }
+  
+    if (interaction.commandName === 'guille_status') {
+      const targetUser = interaction.options.getUser('usuario') ?? interaction.user;
+      const last = loadLastTime(targetUser.id);
+  
+      const texto = targetUser.id === interaction.user.id
+        ? `🕰️ Desde que Guille te habló han pasado: **${getElapsedTimeString(last)}**`
+        : `🕰️ Desde que Guille le habló a **${targetUser.username}** han pasado: **${getElapsedTimeString(last)}**`;
+  
+      await interaction.reply(texto);
+    }
+  });
+  
+  // event listener for mentions in messages
+  client.on(Events.MessageCreate, async message => {
+    if (message.mentions.has(client.user!) && !message.author.bot) {
+      const userId = message.author.id;
+      const last = loadLastTime(userId);
+      await message.reply(
+        `👋 ¡Hola <@${userId}>! Para reiniciar tu contador, usá el comando **/guille_me_hablo**.\n` +
+        `🕰️ Tiempo desde que Guille te habló: **${getElapsedTimeString(last)}**\n` +
+        `📅 También podés setear una fecha con **/set_guille_time** (formato: \`YYYY-MM-DD HH:mm\`).`
+      );
+    }
+  });
+  
+  // log the bot in
+  client.login(TOKEN);
