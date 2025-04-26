@@ -5,7 +5,8 @@ import {
     SlashCommandBuilder,
     REST,
     Routes,
-    Interaction
+    Interaction,
+    EmbedBuilder
   } from 'discord.js';
   import dotenv from 'dotenv';
   import { saveLastTime, loadLastTime } from './storage';
@@ -83,7 +84,11 @@ import {
     if (interaction.commandName === 'guille_me_hablo') {
       const now = new Date();
       saveLastTime(userId, now);
-      await interaction.reply(`⏱️ Contador reiniciado. Han pasado 0 días desde que Guille te habló.`);
+    const embed = new EmbedBuilder()
+        .setDescription('⏱️ Contador reiniciado. Han pasado 0 días desde que Guille te habló.')
+        .setImage('https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExODRscXg0cm54MDdoOTg1b3I3ZHNocmg2eWQwZm8zZWwzNzMyaWx5eiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BiiX0BDQlI6URrqIu3/giphy.gif');
+
+    await interaction.reply({ embeds: [embed] });
     }
   
     if (interaction.commandName === 'set_guille_time') {
