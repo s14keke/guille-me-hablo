@@ -35,3 +35,11 @@ export function loadLastTime(userId: string): Date {
   if (data[userId]) return new Date(data[userId]);
   return new Date(); 
 }
+
+export function getAllTimes(): { userId: string; date: Date }[] {
+  const data = readData();
+  return Object.entries(data).map(([userId, dateString]) => ({
+    userId,
+    date: new Date(dateString),
+  }));
+}

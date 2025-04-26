@@ -9,7 +9,7 @@ import {
     EmbedBuilder
   } from 'discord.js';
   import dotenv from 'dotenv';
-  import { saveLastTime, loadLastTime } from './storage';
+  import { saveLastTime, loadLastTime, getAllTimes} from './src/storage';
   
   dotenv.config();
   
@@ -40,6 +40,9 @@ import {
       .addUserOption(option =>
         option.setName('usuario')
           .setDescription('Usuario a consultar (opcional)')),
+    new SlashCommandBuilder()
+      .setName('guille_ranking')
+      .setDescription('Muestra el ranking de usuarios según hace cuánto Guille no les habla'),
   ].map(command => command.toJSON());
   
 
@@ -113,6 +116,41 @@ import {
         : `🕰️ Desde que Guille le habló a **${targetUser.username}** han pasado: **${getElapsedTimeString(last)}**`;
   
       await interaction.reply(texto);
+    }
+
+    if (interaction.commandName === 'guille_ranking') {
+      const allTimes = getAllTimes();
+  
+      if (allTimes.length === 0) {
+        await interaction.reply('❌ No hay usuarios registrados todavía.');
+        return;
+      }
+  
+      const now = new Date();
+  
+      const ranking = allTimes
+        .map(entry => ({
+          userId: entry.userId,
+          diff: Math.floor((now.getTime() - entry.date.getTime()) / 1000),
+        }))
+        .sort((a, b) => b.diff - a.diff) 
+        .slice(0, 10); 
+  
+      const description = ranking.map((entry, index) => {
+        const days = Math.floor(entry.diff / 86400);
+        const hours = Math.floor((entry.diff % 86400) / 3600);
+        const minutes = Math.floor((entry.diff % 3600) / 60);
+        const seconds = entry.diff % 60;
+  
+        return `**${index + 1}.** <@${entry.userId}> → ${days} días, ${hours} horas, ${minutes} minutos, ${seconds} segundos`;
+      }).join('\n');
+  
+      const embed = new EmbedBuilder()
+        .setTitle('🏆 TOP 10 ignorados por Guille of all time.')
+        .setDescription(description)
+        .setColor(0x00AE86);
+  
+      await interaction.reply({ embeds: [embed] });
     }
   });
   
